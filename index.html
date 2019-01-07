@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Maleeche's Janky Atlas Map</title>
+
+<link rel="stylesheet" href="css/mapStyles.css">
+<link rel="stylesheet" href="js/leaflet/leaflet.css" />
+<link rel="stylesheet" href="leaflet/plugins/L.Control.MousePosition.css" />
+<link rel="stylesheet" href="leaflet/plugins/leaflet-search.css" />
+
+<script src="js/leaflet/leaflet.js"></script>
+<script src="js/jquery.min.js"></script>
+<script src="js/jquery.js"></script>
+<script src="js/jquery.csv.js"></script>
+<script src="js/leaflet/plugins/L.Control.MousePosition.js"></script>
+<script src="js/leaflet/plugins/L.Control.Watermark.js"></script>
+<script src="js/leaflet/plugins/L.Control.Select.js"></script>
+<script src="js/leaflet/plugins/leaflet-search.js"></script>
+
+</head>
+
+<body>
+
+<!--Allow user to load csv file with map data.-->
+<div id="inputs" class="clearfix">
+  <input type="file" id="files" name="files[]" multiple class="inputfile"/>
+  <label for="files">Load Map Data...</label>
+</div>
+
+<div id="map" class="mapimage"></div>
+<script>
+	//HELPER FUNCTIONS---------------------------------------------------------
+	
+	//Make it easier to input Latitude coordinates for the ark map.
+	var arklat = function(x) {
+			n = 100 - x
+		return n;
+	}
+
+//Creates points from csv file-------------------------------------------------
+    function isAPIAvailable() {
+      // Check for the various File API support.
+      if (window.File && window.FileReader && window.FileList && window.Blob) {
+        // Great success! All the File APIs are supported.
+        return true;
+      } else {
+        // source: File API availability - http://caniuse.com/#feat=fileapi
+        // source: <output> availability - http://html5doctor.com/the-output-element/
+        document.writeln('The HTML5 APIs used in this form are only available in the following browsers:<br />');
+        // 6.0 File API & 13.0 <output>
+        document.writeln(' - Google Chrome: 13.0 or later<br />');
+        // 3.6 File API & 6.0 <output>
+        document.writeln(' - Mozilla Firefox: 6.0 or later<br />');
+        // 10.0 File API & 10.0 <output>
+        document.writeln(' - Internet Explorer: Not supported (partial support expected in 10.0)<br />');
+        // ? File API & 5.1 <output>
+        document.writeln(' - Safari: Not supported<br />');
+        // ? File API & 9.2 <output>
+        document.writeln(' - Opera: Not supported');
+        return false;
+      }
+    }
+
+    // Copied from Jerodar's Code
+    // Load the POI data
+    // Async Load and read the csv file
+    $.ajax({
+      url: 'data/markers.csv',
+      type: 'GET',
+      cache: false,
+      success: function (text) {
+        var data = $.csv.toArrays(text);
+        printTable(data);
+      },
+      error: function (jqXHR, textStatus, errorThrown) {
+        console.error(errorThrown);
+      }
+    });
+
+    //This is the function that actually converts csv to array and parses the data.
+    function printTable(data) {   
+        for (var i = 1; i < data.length; i++) {
+        	if (data[i][3]){
+        		var pop = "<dl><dt>" + data[i][3] + "</dt>" + "<center><dt>Lat " + data[i][0] + ", Lng " + data[i][1] + "</dt></center>";
+        	} else {
+        		var pop = "Lat " + data[i][0] + ", Lng " + data[i][1];
+        	}
+        	var group = data[i][2];
+        	
+        	//determine color of marker
+        	switch (group.replace(/\s/g, '')) {
+        		case "crystal":
+        			var markColor = 'white';
+        			break;
+        		case "metal":
+        			var markColor = 'grey';
+        			break;
+        		case "metal_rich":
+        			var markColor = 'goldenrod';
+        			break;
+        		case "obsidian":
+        			var markColor = 'indigo';
+        			break;
+        		case "silica":
+        			var markColor = 'darksalmon';
+        			break; 
+        		case "oil_rock":
+        			var markColor = 'saddlebrown';
+        			break;
+        		case "black_pearl":
+        			var markColor = 'magenta';
+        			break;
+        		case "polymer":
+        			var markColor = 'darkturquoise';
+        			break;
+        		case "cityTerminals":
+        			var markColor = 'lightpink';
+        			break;
+        		case "keratin":
+        			var markColor = 'darkkhaki';
+        			break;
+        		case "river_rock":
+        			var markColor = 'cornflowerblue';
+        			break;
+        		case "gem_green":
+        			var markColor = 'yellowgreen';
+        			break;
+        		case "gem_red":
+        			var markColor = 'lightcoral';
+        			break;
+        		case "bases":
+        			var markColor = 'firebrick';
+        			break;
+        		default:
+        			var markColor = 'green';
+        	}
+
+        	var datmarker = new L.LatLng(data[i][1],data[i][0]),
+			MSD = new L.circleMarker(datmarker, {
+				color: 'black',
+				weight: 1,
+    			fillColor: markColor,
+    			fillOpacity: 0.75,
+    			radius: 5
+			});
+			MSD.addTo(window[group.replace(/\s/g, '')]);
+			MSD.bindPopup(pop);
+		}
+  }
+//End of the "Create points from csv file" section-------------------------------
+
+	//VARIABLES----------------------------------------------------------------
+
+	//Define layer groups
+	var crystal = L.layerGroup();
+	var metal = L.layerGroup();
+	var metal_rich = L.layerGroup();
+	var obsidian = L.layerGroup();
+	var silica = L.layerGroup();
+	var oil_rock = L.layerGroup();
+	var black_pearl = L.layerGroup();
+	var polymer = L.layerGroup();
+	var cityTerminals = L.layerGroup();
+	var keratin = L.layerGroup();
+	var river_rock = L.layerGroup();
+	var gem_green = L.layerGroup();
+	var gem_red = L.layerGroup();
+	var bases = L.layerGroup();
+	var POI = L.layerGroup();
+	var titanCaves = L.layerGroup();
+
+	//MAP CONFIGURATION--------------------------------------------------------
+	
+	//Setup the coordinate system bounds and the image to overlay them on.[[-1.10, -1.625], [101.9, 99.75]];
+	var bounds = [[-100, 100], [100, -100]];
+	var baseMap = L.imageOverlay('images/kataWorld.png', bounds);
+  //var maxBounds = [[-150,-150],[150,150]];
+
+	//Initialize the map object
+	var arkabmap = L.map('map', {
+		crs: L.CRS.Simple,
+		minZoom: 2,
+    maxZoom: 7,
+		layers: [baseMap, bases]
+	});
+
+	//Set initial map view position and zoom.
+	arkabmap.setView( [0, 0], 2);
+  //arkabmap.setMaxBounds(maxBounds);
+
+	//LAYER CONFIGURATION------------------------------------------------------
+	
+	//Layers
+	var baseLayers = {
+		"Atlas": baseMap
+	};
+
+	var overlays = {
+		"Bases": bases,
+		"Freeports": titanCaves,
+		"Points of Interest": POI,
+		"Crystal": crystal,
+		"Metal": metal,
+		"Corn": metal_rich,
+		"Wheat": obsidian,
+		"Carrots": silica,
+		"Salt": oil_rock,
+		"Mint": black_pearl,
+		"Cilantro": polymer,
+		"Sugarcane": cityTerminals,
+		"Fresh Water": keratin,
+		"Beets": river_rock,
+		"Turnips": gem_green,
+		"Chili": gem_red
+		
+	};
+
+	L.control.layers(baseLayers, overlays).addTo(arkabmap);
+
+	//EVENT DRIVEN CONDITIONS--------------------------------------------------
+	
+	//Display Coordinates on click.
+	var popup = L.popup();
+	function onMapClick(e) {
+    	var coord = e.latlng
+    	popup
+        	.setLatLng(e.latlng)
+        	.setContent("Lng " + (coord.lng) + ", Lat " + (coord.lat))
+        	.openOn(arkabmap);
+	}
+	arkabmap.on('click', onMapClick);
+
+	//TESTING------------------------------------------------------------------
+
+	/*Create test marker
+	var alpha_camp = L.latLng([ arklat(30), 49 ]);
+	L.marker(alpha_camp).addTo(arkabmap);
+	*/
+	
+	//Create circles
+	/*var circle = L.circle([arklat(90), 10], {
+    	color: 'red',
+    	fillColor: '#f03',
+    	fillOpacity: 0.5,
+    	radius: 0.125
+	}).addTo(arkabmap);
+	*/
+
+	/*Create PopUp text box
+	L.marker(     alpha_camp).addTo(arkabmap).bindPopup(      'Alpha Camp');
+	*/
+
+//Copied from Jerodar's code
+    // Watermark control with the Cardinal Guild logo
+    L.control.watermark({
+      position: 'bottomright',
+      width: '100px',
+      url: ''
+    }).addTo(arkabmap);
+
+    // Cursor coordinate display
+    L.control.mousePosition({separator: ',', lngFirst: true, numDigits: 2}).addTo(arkabmap);
+    // Player position and lat/long conversion formulas
+    // [lat/long] = 50.0 + ([Y/X] / 8000.0)
+    // [Y/X] = ([lat/long] - 50) * 8000.0
+
+    // Displays a div containing the legend
+    var legend = L.control({position: 'topright'});
+    legend.onAdd = constructLegend;
+    legend.addTo(arkabmap);
+
+  function constructLegend(map) {
+    var div = L.DomUtil.create('div', 'info legend');
+    var container = document.createElement('div');
+    container.appendChild(document.createElement('br'));
+    container.appendChild(document.createTextNode('Map Instructions'));
+    container.appendChild(document.createElement('br'));
+    container.appendChild(document.createElement('br'));
+    container.appendChild(document.createTextNode('1. Click the Layers Group button in the top right'));
+    container.appendChild(document.createElement('br'));
+    container.appendChild(document.createTextNode('to select the markers you want to display on the map.'));
+    container.appendChild(document.createElement('br'));
+    container.appendChild(document.createElement('br'));
+    container.appendChild(document.createTextNode('2. Click one of the markers on the map to get the'));
+    container.appendChild(document.createElement('br'));
+    container.appendChild(document.createTextNode('coordinates of that marker and a description (if applicable).'));
+    container.appendChild(document.createElement('br'));
+    container.appendChild(document.createElement('br'));
+    container.appendChild(document.createTextNode('3. Click anywhere on the map to display a'));
+    container.appendChild(document.createElement('br'));
+    container.appendChild(document.createTextNode('popup with the coordinates of that position.'));
+    container.appendChild(document.createElement('br'));
+    container.appendChild(document.createElement('br'));
+    container.appendChild(document.createTextNode('4. Use your mouse wheel to zoom in/out.'));
+    container.appendChild(document.createElement('br'));
+    container.appendChild(document.createElement('br'));
+    container.appendChild(document.createTextNode('5. Click and hold down your left mouse button anywhere on the map,'));
+    container.appendChild(document.createElement('br'));
+    container.appendChild(document.createTextNode('then move your mouse around to drag the map view.'));
+    container.appendChild(document.createElement('br'));
+    container.appendChild(document.createElement('br'));
+    container.appendChild(document.createTextNode('6. Use the Lat/Lng readout in the top left corner to'));
+    container.appendChild(document.createElement('br'));
+    container.appendChild(document.createTextNode('get coordinates without clicking on the map.'));
+    container.appendChild(document.createElement('br'));
+    container.appendChild(document.createElement('br'));
+
+    container.appendChild(document.createElement('br'));
+    container.appendChild(document.createElement('br'));
+
+    div.innerHTML = container.innerHTML;
+    return div;
+  }
+
+</script>
+
+</body>
+
+</html>
